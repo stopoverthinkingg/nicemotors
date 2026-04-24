@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>나이스모터스 - 청주 중고차 전문 딜러</title>
 <meta name="description" content="청주 엑스포매매단지 나이스모터스 - 충북 최고의 중고차 전문 딜러. 직거래·알선·매입 전문"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -432,6 +433,45 @@ input[type=text]:focus{outline:none;border-color:#1D9E75;background:#fff;}
 footer{background:#1a1a1a;color:#aaa;padding:24px;text-align:center;font-size:12px;margin-top:20px;line-height:1.8;}
 footer strong{color:#fff;}
 
+
+/* ━━━ 관리자 로그인 ━━━ */
+.admin-lock{display:none;}
+.admin-only{display:none!important;}
+.admin-active .admin-only{display:flex!important;}
+.admin-active .admin-lock{display:block;}
+
+.admin-login-wrap{
+  position:fixed;inset:0;background:rgba(0,0,0,0.6);
+  z-index:9999;display:flex;align-items:center;justify-content:center;
+  backdrop-filter:blur(6px);
+}
+.admin-login-box{
+  background:#fff;border-radius:16px;padding:32px 28px;
+  width:100%;max-width:360px;text-align:center;
+}
+.admin-login-box h2{font-size:18px;font-weight:900;margin-bottom:6px;}
+.admin-login-box p{font-size:13px;color:#aaa;margin-bottom:22px;}
+.admin-login-box input{
+  width:100%;padding:12px 14px;font-size:15px;
+  border:1.5px solid #e8e8e0;border-radius:9px;
+  font-family:inherit;text-align:center;letter-spacing:3px;
+  margin-bottom:10px;
+}
+.admin-login-box input:focus{outline:none;border-color:#1D9E75;}
+.admin-login-btn{
+  width:100%;padding:12px;background:#1D9E75;color:#fff;
+  border:none;border-radius:9px;font-size:15px;font-weight:700;
+  cursor:pointer;font-family:inherit;
+}
+.admin-login-btn:hover{background:#0F6E56;}
+.admin-err{font-size:12px;color:#e74c3c;margin-top:6px;min-height:18px;}
+.admin-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 12px;background:#E1F5EE;border-radius:20px;
+  font-size:12px;font-weight:700;color:#0F6E56;cursor:pointer;
+}
+.admin-badge:hover{background:#c8edd8;}
+
 /* ━━━ 반응형 ━━━ */
 @media(max-width:800px){
   .layout{padding:10px;}
@@ -450,6 +490,19 @@ footer strong{color:#fff;}
 </style>
 </head>
 <body>
+
+<!-- ━━━ 관리자 로그인 모달 ━━━ -->
+<div class="admin-login-wrap" id="adminLoginWrap" style="display:none;">
+  <div class="admin-login-box">
+    <h2>🔐 관리자 로그인</h2>
+    <p>나이스모터스 딜러 전용<br/>비밀번호를 입력해주세요</p>
+    <input type="password" id="adminPwInput" placeholder="••••••••" onkeydown="if(event.key==='Enter')checkAdminPw()"/>
+    <button class="admin-login-btn" onclick="checkAdminPw()">로그인</button>
+    <div class="admin-err" id="adminErr"></div>
+    <button onclick="closeAdminLogin()" style="margin-top:12px;background:none;border:none;font-size:12px;color:#aaa;cursor:pointer;font-family:inherit;">취소</button>
+  </div>
+</div>
+
 
 <!-- ━━━ 랜딩 페이지 (토스 스타일) ━━━ -->
 <div id="landing-page">
@@ -646,8 +699,13 @@ footer strong{color:#fff;}
       </div>
     </div>
     <div class="hdr-nav">
-      <button class="nav-btn nav-paste" onclick="togglePaste()">글 붙여넣기</button>
-      <button class="nav-btn nav-add" onclick="openAddModal()">+ 매물 등록</button>
+      <span id="adminBadge" class="admin-badge" onclick="logoutAdmin()" style="display:none;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="#0F6E56"><path d="M12 2C9.24 2 7 4.24 7 7s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 12c-5.33 0-8 2.67-8 4v2h16v-2c0-1.33-2.67-4-8-4z"/></svg>
+        관리자 모드
+      </span>
+      <button class="nav-btn nav-paste admin-only" onclick="togglePaste()">글 붙여넣기</button>
+      <button class="nav-btn nav-add admin-only" onclick="openAddModal()">+ 매물 등록</button>
+      <button class="nav-btn nav-paste" id="adminLoginBtn" onclick="openAdminLogin()" style="border:1px solid #ddd;">🔐 관리자</button>
       <button class="nav-btn nav-kakao" onclick="goKakao()">카카오 상담</button>
     </div>
   </div>
@@ -741,7 +799,7 @@ footer strong{color:#fff;}
     <!-- 메인 -->
     <main class="main">
       <!-- 붙여넣기 -->
-      <div class="paste-panel hidden" id="pastePanel">
+      <div class="paste-panel hidden admin-only" id="pastePanel">
         <div class="paste-header">
           <span class="paste-title">밴드 게시글 붙여넣기</span>
           <button class="btn-ghost" style="padding:4px 9px;font-size:11px;" onclick="togglePaste()">닫기</button>
@@ -1138,30 +1196,133 @@ function initLanding(){
 // DOM 로드 후 초기화
 document.addEventListener('DOMContentLoaded', initLanding);
 
+
+/* ━━━ 관리자 권한 ━━━ */
+const ADMIN_PW = 'NICE1234'; // ← 비밀번호 변경 시 여기만 수정
+
+function isAdmin(){
+  return sessionStorage.getItem('nm_admin') === 'yes';
+}
+
+function applyAdminState(){
+  const body = document.body;
+  if(isAdmin()){
+    body.classList.add('admin-active');
+    document.getElementById('adminBadge').style.display='inline-flex';
+    document.getElementById('adminLoginBtn').style.display='none';
+  } else {
+    body.classList.remove('admin-active');
+    document.getElementById('adminBadge').style.display='none';
+    document.getElementById('adminLoginBtn').style.display='';
+  }
+}
+
+function openAdminLogin(){
+  document.getElementById('adminLoginWrap').style.display='flex';
+  setTimeout(()=>document.getElementById('adminPwInput').focus(),100);
+}
+
+function closeAdminLogin(){
+  document.getElementById('adminLoginWrap').style.display='none';
+  document.getElementById('adminPwInput').value='';
+  document.getElementById('adminErr').textContent='';
+}
+
+function checkAdminPw(){
+  const pw = document.getElementById('adminPwInput').value;
+  if(pw === ADMIN_PW){
+    sessionStorage.setItem('nm_admin','yes');
+    closeAdminLogin();
+    applyAdminState();
+  } else {
+    document.getElementById('adminErr').textContent='비밀번호가 틀렸어요.';
+    document.getElementById('adminPwInput').value='';
+    document.getElementById('adminPwInput').focus();
+  }
+}
+
+function logoutAdmin(){
+  if(!confirm('관리자 모드를 종료할까요?')) return;
+  sessionStorage.removeItem('nm_admin');
+  applyAdminState();
+}
+
+// 페이지 로드 시 관리자 상태 복원
+document.addEventListener('DOMContentLoaded', applyAdminState);
+
+/* ━━━ Supabase 초기화 ━━━ */
+const SUPABASE_URL = 'https://ormjkxizgqyusdfkzibb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ybWpreGl6Z3F5dXNkZmt6aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NzQ0ODMsImV4cCI6MjA5MjE1MDQ4M30.cYmPGPJuIaXeDlyx57ZN6OTGhGqB4zPXKpdOr9y8IZs';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 /* ━━━ 상태 ━━━ */
 let cars=[], wishes=new Set(), currentSort='new', editingId=null, editPhotos=[];
 const todayKey=new Date().toDateString();
-let settings={phone:'',kakao:''};
-
-try{cars=JSON.parse(localStorage.getItem('nm_cars')||'[]');}catch(e){}
-try{wishes=new Set(JSON.parse(localStorage.getItem('nm_wishes')||'[]'));}catch(e){}
-try{settings=JSON.parse(localStorage.getItem('nm_settings')||'{}');}catch(e){}
+let settings={phone:'',kakao:'http://pf.kakao.com/_YtXCX/chat'};
 let todayCount=parseInt(localStorage.getItem('nm_today_'+todayKey)||'0');
 
-settings.phone=settings.phone||'';
-settings.kakao=settings.kakao||'';
+try{wishes=new Set(JSON.parse(localStorage.getItem('nm_wishes')||'[]'));}catch(e){}
 
 const CAR_NAMES=['아반떼','쏘나타','소나타','그랜저','싼타페','투싼','스포티지','코나','카니발','스타리아','팰리세이드','K3','K5','K7','K8','K9','스팅어','모하비','쏘렌토','레이','모닝','스파크','트레일블레이저','이쿼녹스','G80','GV80','G70','GV70','GV90','볼트','봉고','포터','렉스턴','티볼리','코란도','토레스','벤츠','BMW','아우디','볼보','포르쉐','제네시스'];
 const COLORS=['흰색','검정','은색','회색','빨강','파랑','블루','갈색','베이지','노랑','초록','연두','보라','주황','골드'];
 
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
-function save(){try{localStorage.setItem('nm_cars',JSON.stringify(cars));localStorage.setItem('nm_wishes',JSON.stringify([...wishes]));}catch(e){}}
-function saveSettings(){
-  settings.phone=document.getElementById('settingPhone').value.trim();
-  settings.kakao=document.getElementById('settingKakao').value.trim();
-  localStorage.setItem('nm_settings',JSON.stringify(settings));
-  document.getElementById('aboutPhone').textContent=settings.phone||'번호를 설정해주세요';
+function save(){
+  // wishes는 로컬에 유지 (개인 설정)
+  try{localStorage.setItem('nm_wishes',JSON.stringify([...wishes]));}catch(e){}
 }
+
+// Supabase에서 매물 불러오기
+async function loadCars(){
+  const {data, error} = await sb.from('cars').select('*').order('regts', {ascending: false});
+  if(error){console.error('loadCars error:', error);return;}
+  cars = (data || []).map(r => ({
+    id: r.id, carType: r.cartype, name: r.name, year: r.year,
+    yearNum: r.yearnum, km: r.km, kmNum: r.kmnum, color: r.color,
+    price: r.price, priceNum: r.pricenum, phone: r.phone,
+    notes: r.notes || '', dealer: r.dealer, extra: r.extra || '',
+    photos: r.photos || [], regDate: r.regdate, regTs: r.regts
+  }));
+  updateTypeFilter(); renderCars(); updateStats();
+}
+
+// Supabase에 매물 저장
+async function saveCar(car){
+  const row = {
+    id: car.id, cartype: car.carType, name: car.name, year: car.year,
+    yearnum: car.yearNum, km: car.km, kmnum: car.kmNum, color: car.color,
+    price: car.price, pricenum: car.priceNum, phone: car.phone,
+    notes: car.notes, dealer: car.dealer, extra: car.extra,
+    photos: car.photos, regdate: car.regDate, regts: car.regTs
+  };
+  const {error} = await sb.from('cars').upsert(row);
+  if(error) console.error('saveCar error:', error);
+}
+
+// Supabase에서 매물 삭제
+async function deletCarDB(id){
+  const {error} = await sb.from('cars').delete().eq('id', id);
+  if(error) console.error('deleteCar error:', error);
+}
+
+// 설정 불러오기
+async function loadSettings(){
+  const {data} = await sb.from('settings').select('*');
+  if(data) data.forEach(row => { settings[row.key] = row.value; });
+  document.getElementById('settingPhone').value = settings.phone || '';
+  document.getElementById('settingKakao').value = settings.kakao || '';
+  document.getElementById('aboutPhone').textContent = settings.phone || '번호를 설정해주세요';
+}
+
+// 설정 저장
+async function saveSettingsDB(){
+  const phone = document.getElementById('settingPhone').value.trim();
+  const kakao = document.getElementById('settingKakao').value.trim();
+  settings.phone = phone; settings.kakao = kakao;
+  await sb.from('settings').upsert([{key:'phone', value:phone},{key:'kakao', value:kakao}]);
+  document.getElementById('aboutPhone').textContent = phone || '번호를 설정해주세요';
+}
+function saveSettings(){ saveSettingsDB(); }
 
 /* ━━━ 탭 ━━━ */
 function showTab(tab){
@@ -1258,7 +1419,7 @@ function parseLine(line){
   return{id:uid(),carType:'alson',name:name||'차량명확인',year,yearNum,km,kmNum,color,price,priceNum:prices[0]||0,phone,notes:notes.join('·'),extra:'',dealer:'나이스모터스',photos:[],regDate:todayKey,regTs:Date.now()};
 }
 
-function parsePaste(){
+async function parsePaste(){
   const txt=document.getElementById('pasteInput').value;
   const err=document.getElementById('parseErr');
   if(!txt.trim()){err.textContent='텍스트를 붙여넣어 주세요.';return;}
@@ -1274,7 +1435,7 @@ function parsePaste(){
     parsed=txt.split('\n').map(parseLine).filter(Boolean);
   }
   if(!parsed.length){err.textContent='인식된 매물이 없어요. 연식·가격 정보가 있는지 확인해주세요.';return;}
-  parsed.forEach(c=>{cars.push(c);todayCount++;});
+  for(const car of parsed){cars.push(car);todayCount++;await saveCar(car);}
   localStorage.setItem('nm_today_'+todayKey,todayCount);
   save();
   document.getElementById('pasteInput').value='';
@@ -1389,8 +1550,8 @@ function renderCars(){
         <div class="card-actions">
           <button class="act-btn act-kakao" onclick="kakaoContact('${c.phone||''}','${c.name}','${c.price||''}')">카카오 상담</button>
           <button class="act-btn act-call" onclick="callContact('${c.phone||''}')">📞 전화</button>
-          <button class="act-btn act-edit" onclick="openEditModal('${c.id}')">수정</button>
-          <button class="act-btn act-del" onclick="deleteCar('${c.id}')">삭제</button>
+          <button class="act-btn act-edit admin-only" onclick="openEditModal('${c.id}')">수정</button>
+          <button class="act-btn act-del admin-only" onclick="deleteCar('${c.id}')">삭제</button>
         </div>
       </div>
     </div>`;
@@ -1461,7 +1622,7 @@ function handlePhotos(e){
     editPhotos=[...editPhotos,...results];renderPhotoPreview();document.getElementById('photoInput').value='';
   });
 }
-function saveEdit(){
+async function saveEdit(){
   const name=document.getElementById('eN').value.trim();
   if(!name){alert('차종명을 입력해주세요.');return;}
   const priceRaw=document.getElementById('eP').value.trim();
@@ -1476,9 +1637,10 @@ function saveEdit(){
   const data={name,year:yearRaw,yearNum,color:document.getElementById('eC').value.trim(),km:kmRaw,kmNum,price,priceNum,phone:document.getElementById('ePh').value.trim(),dealer:document.getElementById('eDealer').value.trim()||'나이스모터스',notes:document.getElementById('eNote').value.trim(),carType:document.getElementById('eType').value,photos:editPhotos,extra:''};
   if(editingId){
     const idx=cars.findIndex(x=>x.id===editingId);
-    if(idx>=0)cars[idx]={...cars[idx],...data};
+    if(idx>=0){cars[idx]={...cars[idx],...data};await saveCar(cars[idx]);}
   } else {
-    cars.push({...data,id:uid(),regDate:todayKey,regTs:Date.now()});
+    const nc={...data,id:uid(),regDate:todayKey,regTs:Date.now()};
+    cars.push(nc);await saveCar(nc);
     todayCount++;localStorage.setItem('nm_today_'+todayKey,todayCount);
   }
   save();closeModal();updateTypeFilter();renderCars();updateStats();
@@ -1486,6 +1648,7 @@ function saveEdit(){
 function deleteCar(id){
   if(!confirm('이 매물을 삭제할까요?'))return;
   cars=cars.filter(c=>c.id!==id);wishes.delete(id);
+  deletCarDB(id);
   save();updateTypeFilter();renderCars();updateStats();
 }
 
@@ -1531,8 +1694,161 @@ function submitBuy(){
 document.getElementById('settingPhone').value=settings.phone;
 document.getElementById('settingKakao').value=settings.kakao||'http://pf.kakao.com/_YtXCX/chat';
 document.getElementById('aboutPhone').textContent=settings.phone||'번호를 설정해주세요';
-updateTypeFilter();renderCars();updateStats();
+// Supabase에서 데이터 로드
+(async()=>{
+  await loadSettings();
+  await loadCars();
+  applyAdminState();
+})();
 </script>
 </div><!-- /main-app -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ━━━ Supabase 연결 ━━━ */
+const SUPA_URL = 'https://ormjkxizgqyusdfkzibb.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ybWpreGl6Z3F5dXNkZmt6aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1NzQ0ODMsImV4cCI6MjA5MjE1MDQ4M30.cYmPGPJuIaXeDlyx57ZN6OTGhGqB4zPXKpdOr9y8IZs';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+/* ━━━ DB에서 매물 불러오기 ━━━ */
+async function loadCarsFromDB() {
+  const { data, error } = await supa.from('cars').select('*').order('regts', { ascending: false });
+  if (error) { console.error('매물 로딩 실패:', error); return; }
+  cars = data.map(r => ({
+    id: r.id, carType: r.cartype, name: r.name,
+    year: r.year, yearNum: r.yearnum||0,
+    km: r.km, kmNum: r.kmnum||0,
+    color: r.color, price: r.price, priceNum: r.pricenum||0,
+    phone: r.phone, notes: r.notes||'',
+    dealer: r.dealer||'나이스모터스',
+    extra: r.extra||'', photos: r.photos||[],
+    regDate: r.regdate, regTs: r.regts||0
+  }));
+  updateTypeFilter(); renderCars(); updateStats();
+  console.log('매물 로딩 완료:', cars.length, '대');
+}
+
+/* ━━━ DB에 매물 저장 ━━━ */
+async function saveCarToDB(car) {
+  const { error } = await supa.from('cars').upsert({
+    id: car.id, cartype: car.carType||'alson',
+    name: car.name, year: car.year, yearnum: car.yearNum||0,
+    km: car.km, kmnum: car.kmNum||0, color: car.color,
+    price: car.price, pricenum: car.priceNum||0,
+    phone: car.phone, notes: car.notes,
+    dealer: car.dealer||'나이스모터스',
+    extra: car.extra||'', photos: car.photos||[],
+    regdate: car.regDate, regts: car.regTs||Date.now()
+  });
+  if (error) { console.error('저장 실패:', error); alert('저장 실패: ' + error.message); return false; }
+  return true;
+}
+
+/* ━━━ DB에서 매물 삭제 ━━━ */
+async function deleteCarFromDB(id) {
+  const { error } = await supa.from('cars').delete().eq('id', id);
+  if (error) { console.error('삭제 실패:', error); return false; }
+  return true;
+}
+
+/* ━━━ 기존 함수 오버라이드 ━━━ */
+// 저장 함수 - localStorage 대신 DB 사용
+const _origSave = save;
+function save() {
+  // localStorage는 백업용으로만 유지
+  try { localStorage.setItem('nm_cars', JSON.stringify(cars)); } catch(e) {}
+}
+
+// saveEdit 오버라이드
+const _origSaveEdit = saveEdit;
+window.saveEdit = async function() {
+  const name = document.getElementById('eN').value.trim();
+  if (!name) { alert('차종명을 입력해주세요.'); return; }
+  const priceRaw = document.getElementById('eP').value.trim();
+  const priceNum = parseInt((priceRaw.match(/\d+/)||[0])[0])||0;
+  const price = priceNum ? priceNum+'만원' : '';
+  const yearRaw = document.getElementById('eY').value.trim();
+  const yearNumM = yearRaw.match(/(\d{4})/);
+  const yearNum = yearNumM ? parseInt(yearNumM[1]) : 0;
+  const kmRaw = document.getElementById('eK').value.trim();
+  const kmNumM = kmRaw.match(/(\d+\.?\d*)/);
+  const kmNum = kmNumM ? parseFloat(kmNumM[1]) : 0;
+  const data = {
+    id: editingId || uid(),
+    carType: document.getElementById('eType').value,
+    name, year: yearRaw, yearNum, color: document.getElementById('eC').value.trim(),
+    km: kmRaw, kmNum, price, priceNum,
+    phone: document.getElementById('ePh').value.trim(),
+    dealer: document.getElementById('eDealer').value.trim()||'나이스모터스',
+    notes: document.getElementById('eNote').value.trim(),
+    photos: editPhotos,
+    extra: '',
+    regDate: new Date().toDateString(),
+    regTs: Date.now()
+  };
+
+  const ok = await saveCarToDB(data);
+  if (!ok) return;
+
+  if (editingId) {
+    const idx = cars.findIndex(x => x.id === editingId);
+    if (idx >= 0) cars[idx] = data;
+  } else {
+    cars.unshift(data);
+    todayCount++;
+    localStorage.setItem('nm_today_'+todayKey, todayCount);
+  }
+  save(); closeModal(); updateTypeFilter(); renderCars(); updateStats();
+};
+
+// deleteCar 오버라이드
+window.deleteCar = async function(id) {
+  if (!confirm('이 매물을 삭제할까요?')) return;
+  const ok = await deleteCarFromDB(id);
+  if (!ok) return;
+  cars = cars.filter(c => c.id !== id);
+  wishes.delete(id);
+  save(); updateTypeFilter(); renderCars(); updateStats();
+};
+
+// parsePaste 후 DB 저장 오버라이드
+const _origParsePaste = window.parsePaste;
+window.parsePaste = async function() {
+  const txt = document.getElementById('pasteInput').value;
+  const err = document.getElementById('parseErr');
+  if (!txt.trim()) { err.textContent = '텍스트를 붙여넣어 주세요.'; return; }
+  err.textContent = '';
+  let parsed = [];
+  if (isStructured(txt)) {
+    const blocks = txt.split(/(?=★\s*차량종류)/);
+    const results = blocks.map(b=>b.trim()).filter(Boolean)
+      .map(b=>isStructured(b)?parseStructured(b):parseLine(b)).filter(Boolean);
+    parsed = results.length ? results : [];
+    if (!parsed.length) { const s = isStructured(txt)?parseStructured(txt):parseLine(txt); if(s) parsed=[s]; }
+    if (!parsed.length) parsed = txt.split('\n').map(parseLine).filter(Boolean);
+  } else {
+    parsed = txt.split('\n').map(parseLine).filter(Boolean);
+  }
+  if (!parsed.length) { err.textContent = '인식된 매물이 없어요.'; return; }
+
+  err.textContent = '저장 중...';
+  for (const car of parsed) {
+    const ok = await saveCarToDB(car);
+    if (ok) { cars.unshift(car); todayCount++; }
+  }
+  localStorage.setItem('nm_today_'+todayKey, todayCount);
+  save();
+  document.getElementById('pasteInput').value = '';
+  document.getElementById('pastePanel').classList.add('hidden');
+  err.textContent = '';
+  updateTypeFilter(); renderCars(); updateStats();
+};
+
+// 페이지 로드 시 DB에서 매물 불러오기
+document.addEventListener('DOMContentLoaded', () => {
+  loadCarsFromDB();
+});
+</script>
+
 </body>
 </html>
